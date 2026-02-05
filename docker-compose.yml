@@ -31,5 +31,18 @@ services:
       POSTGRES_PASSWORD: pass
       PORT: 3000
 
+  client:
+    build: ./client
+    container_name: chat_client
+    restart: always
+    ports:
+      - "5173:5173"
+    depends_on:
+      - nodeapp
+    environment:
+      VITE_API_URL: http://localhost:3000
+    volumes:
+      - ./client/src:/app/src
+
 volumes:
   pgdata:
