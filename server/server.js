@@ -1,0 +1,116 @@
+import 'dotenv/config.js';
+import express, { json } from 'express';
+import { hash as _hash, compare } from 'bcrypt';
+import jwtPkg from 'jsonwebtoken';
+const { sign } = jwtPkg;
+import cors from 'cors';
+import init, { createUser, getUserByUsername, getConversationsByUserId, createConversation } from './db.js';
+
+console.log("[SERVER] Starting server initialization...");
+
+const app = express();
+app.use(json());
+app.use(cors());
+
+const JWT_SECRET = "dev_secret";
+
+/* SIGNUP */
+app.post('/signup', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password)
+    return res.status(400).json({ error: "Missing credentials" });
+  
+  console.log(`[SERVER] POST /signup - Username: ${username}`);
+  
+  try {
+    const hash = await _hash(password, 10);
+    console.log(`[SERVER] Password hashed for user: ${username}`);
+
+    await createUser(username, hash);
+    
+    const result = await getUserByUsername(username);
+    const userId = result.id;
+    console.log(`[SERVER] User created successfully - ID: ${userId}, Username: ${username}`);
+    res.json({ userId });
+  } catch (err) {
+    console.error(`[SERVER] Signup error for ${username}:`, err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/* LOGIN */
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body;
+  console.log(`[SERVER] POST /login - Username: ${username}`);
+  
+  try {
+    const user = await getUserByUsername(username);
+
+    if (!user) {
+      console.log(`[SERVER] Login failed - User not found: ${username}`);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const valid = await compare(password, user.password_hash);
+    if (!valid) {
+      console.log(`[SERVER] Login failed - Invalid password for user: ${username}`);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const userId = user.id;
+    console.log(`[SERVER] Password verified for user: ${username} (ID: ${userId})`);
+
+    const convos = await getConversationsByUserId(userId);
+    
+    const token = sign({ userId }, JWT_SECRET);
+    console.log(`[SERVER] Login successful - User: ${username} (ID: ${userId}), Conversations: ${convos.length}`);
+
+    res.json({
+      token,
+      userId,
+      conversations: convos
+    });
+  } catch (err) {
+    console.error(`[SERVER] Login error for ${username}:`, err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/* CREATE NEW CONVO */
+app.post('/conversations', async (req, res) => {
+  const { userId, title } = req.body;
+  console.log(`[SERVER] POST /conversations - User: ${userId}, Title: ${title || 'New Chat'}`);
+  
+  try {
+    const conversationTitle = title || 'New Chat';
+    const result = await createConversation(userId, conversationTitle);
+    
+    console.log(`[SERVER] Conversation created - ID: ${result.id}, User: ${userId}`);
+    res.json({ conversationId: result.id });
+  } catch (err) {
+    console.error(`[SERVER] Create conversation error for user ${userId}:`, err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
+
+async function start() {
+  try {
+    console.log("[SERVER] Initializing database...");
+    await init();
+    
+    app.listen(PORT, () => {
+      console.log(`[SERVER] ========== Server Ready ==========`);
+      console.log(`[SERVER] Node auth MS running on port ${PORT}`);
+      console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`[SERVER] Ready to accept connections`);
+    });
+  } catch (err) {
+    console.error('[SERVER] ========== Server Startup Failed ==========');
+    console.error('[SERVER] Error:', err.message);
+    process.exit(1);
+  }
+}
+
+start();
