@@ -1,0 +1,125 @@
+.chat-select-wrapper {
+  padding: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.chat-select-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.chat-select-header h2 {
+  margin: 0;
+  color: #333;
+}
+
+.logout-btn {
+  background-color: #d32f2f;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.logout-btn:hover {
+  background-color: #b71c1c;
+}
+
+.create-chat-container {
+  margin-bottom: 30px;
+  padding: 20px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.create-chat-container h3 {
+  margin-top: 0;
+  color: #333;
+}
+
+.chat-error {
+  color: #d32f2f;
+  margin-bottom: 10px;
+  font-size: 0.9em;
+}
+
+.create-chat-input {
+  width: 80%;
+  margin-right: 10px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.95em;
+}
+
+.create-chat-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.create-btn {
+  background-color: #667eea;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95em;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.create-btn:hover:not(:disabled) {
+  background-color: #5568d3;
+}
+
+.create-btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.conversations-section h3 {
+  color: #333;
+}
+
+.conversations-empty {
+  color: #666;
+  font-size: 0.95em;
+}
+
+.conversations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.conversation-item {
+  padding: 12px;
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 1em;
+  transition: background-color 0.2s;
+  font-weight: 500;
+}
+
+.conversation-item:hover {
+  background-color: #e8e8e8;
+}
+
+.conversation-id {
+  color: #999;
+  font-size: 0.9em;
+  margin-left: 8px;
+}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { createConversation } from "../api";
 import { useNavigate } from "react-router-dom";
+import "../css/chatSelect.css";
 
 export default function ChatSelect() {
   const nav = useNavigate();
@@ -45,59 +46,55 @@ export default function ChatSelect() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("conversations");
+    nav("/");
+  };
+
   return (
-    <div style={{ padding: "20px", maxWidth: "600px", margin: "0 auto" }}>
-      <h2>My Chats</h2>
+    <div className="chat-select-wrapper">
+      <div className="chat-select-header">
+        <h2>My Chats</h2>
+        <button className="logout-btn" onClick={handleLogout}>
+          Logout
+        </button>
+      </div>
       
-      <div style={{ marginBottom: "30px", padding: "20px", backgroundColor: "white", borderRadius: "8px" }}>
+      <div className="create-chat-container">
         <h3>Create New Chat</h3>
-        {error && <p style={{ color: "#d32f2f", marginBottom: "10px" }}>{error}</p>}
+        {error && <p className="chat-error">{error}</p>}
         <input
           type="text"
+          className="create-chat-input"
           placeholder="Enter chat title"
           value={newTitle}
           onChange={e => setNewTitle(e.target.value)}
           onKeyPress={e => e.key === "Enter" && handleCreateNew()}
-          style={{ width: "80%", marginRight: "10px", padding: "8px" }}
         />
         <button
+          className="create-btn"
           onClick={handleCreateNew}
           disabled={loading}
-          style={{
-            backgroundColor: loading ? "#ccc" : "#667eea",
-            color: "white",
-            border: "none",
-            padding: "8px 16px",
-            borderRadius: "4px",
-            cursor: loading ? "not-allowed" : "pointer"
-          }}
         >
           {loading ? "Creating..." : "Create"}
         </button>
       </div>
 
-      <div>
+      <div className="conversations-section">
         <h3>Your Conversations</h3>
         {conversations.length === 0 ? (
-          <p style={{ color: "#666" }}>No conversations yet. Create one above!</p>
+          <p className="conversations-empty">No conversations yet. Create one above!</p>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          <div className="conversations-list">
             {conversations.map(c => (
               <button
                 key={c.id}
+                className="conversation-item"
                 onClick={() => nav(`/chat/${c.id}`)}
-                style={{
-                  padding: "12px",
-                  backgroundColor: "#f0f0f0",
-                  border: "1px solid #ddd",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  fontSize: "1em",
-                  transition: "background-color 0.2s"
-                }}
               >
-                {c.title} <span style={{ color: "#999", fontSize: "0.9em" }}>#{c.id}</span>
+                {c.title} <span className="conversation-id">#{c.id}</span>
               </button>
             ))}
           </div>
