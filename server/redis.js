@@ -55,10 +55,17 @@ export async function getMessages(conversationId, start = 0, end = -1) {
 	return await client.lRange(key, start, end);
 }
 
+export async function getLength(conversationId) {
+	if (!client) await connectRedis();
+	const key = `conversation:${conversationId}`;
+	return await client.lLen(key);
+}
+
 export default {
 	connectRedis,
 	exists,
 	initConversation,
 	pushMessage,
 	getMessages,
+	getLength,
 };

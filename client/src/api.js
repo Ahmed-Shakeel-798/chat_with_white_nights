@@ -42,4 +42,14 @@ export const initConversation = (conversationId) => {
   return api.post('/conversations/init', { conversationId });
 };
 
+export const getConversationMessages = (conversationId, start, end) => {
+  let url = `/conversations/${conversationId}/messages`;
+
+  if (start !== undefined && end !== undefined) {
+    url += `?start=${start}&end=${end}`;
+  }
+
+  return api.get(url);
+};
+
 export default api;
