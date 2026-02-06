@@ -5,12 +5,15 @@ import jwtPkg from 'jsonwebtoken';
 const { sign } = jwtPkg;
 import cors from 'cors';
 import init, { createUser, getUserByUsername, getConversationsByUserId, createConversation } from './db.js';
+import { connectRedis, initConversation as redisInitConversation } from './redis.js';
 
 console.log("[SERVER] Starting server initialization...");
 
 const app = express();
 app.use(json());
 app.use(cors());
+
+// Redis helpers are in ./redis.js
 
 const JWT_SECRET = "dev_secret";
 
@@ -93,12 +96,31 @@ app.post('/conversations', async (req, res) => {
   }
 });
 
+/* INIT CONVERSATION IN REDIS */
+app.post('/conversations/init', async (req, res) => {
+  const { conversationId } = req.body;
+  if (!conversationId) return res.status(400).json({ error: 'Missing conversationId' });
+  try {
+    const result = await redisInitConversation(conversationId);
+    if (result.already) {
+      console.log(`[SERVER] Redis key already exists for conversation:${conversationId}`);
+      return res.json({ ok: true, message: 'Already initialized' });
+    }
+    console.log(`[SERVER] Initialized redis list for conversation ${conversationId}`);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[SERVER] Error initializing conversation in Redis:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 
 async function start() {
   try {
     console.log("[SERVER] Initializing database...");
     await init();
+    await connectRedis();
     
     app.listen(PORT, () => {
       console.log(`[SERVER] ========== Server Ready ==========`);

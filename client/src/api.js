@@ -38,4 +38,8 @@ export const createConversation = (userId, title) => {
   return api.post('/conversations', { userId, title });
 };
 
+export const initConversation = (conversationId) => {
+  return api.post('/conversations/init', { conversationId });
+};
+
 export default api;
