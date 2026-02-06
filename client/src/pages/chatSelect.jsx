@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { createConversation } from "../api";
+import { initConversation } from "../api";
 import { useNavigate } from "react-router-dom";
 import "../css/chatSelect.css";
 
@@ -37,6 +38,11 @@ export default function ChatSelect() {
       
       setNewTitle("");
       setError("");
+      try {
+        await initConversation(res.data.conversationId);
+      } catch (err) {
+        console.error('[CHAT SELECT] Warning: failed to init conversation in redis', err);
+      }
       nav(`/chat/${res.data.conversationId}`);
     } catch (err) {
       setError(err.response?.data?.error || "Failed to create chat");
@@ -92,7 +98,14 @@ export default function ChatSelect() {
               <button
                 key={c.id}
                 className="conversation-item"
-                onClick={() => nav(`/chat/${c.id}`)}
+                onClick={async () => {
+                  try {
+                    await initConversation(c.id);
+                  } catch (err) {
+                    console.error('[CHAT SELECT] Warning: failed to init conversation in redis', err);
+                  }
+                  nav(`/chat/${c.id}`);
+                }}
               >
                 {c.title} <span className="conversation-id">#{c.id}</span>
               </button>
