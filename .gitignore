@@ -64,3 +64,18 @@ logs/
 # Node specific
 package-lock.json
 yarn.lock
+
+# Python specific
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.pytest_cache/
+.coverage
+*.egg-info/
+.installed.cfg
+*.egg
