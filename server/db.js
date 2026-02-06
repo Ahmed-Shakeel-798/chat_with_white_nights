@@ -17,6 +17,10 @@ const adminConfig = {
   database: "postgres", // connect to default db first
 };
 
+/**
+ * Setting up a connection pool for the application database.
+ * The pool will be initialized on first use to ensure the database is ready.
+ */
 const appConfig = {
   host: DB_HOST,
   port: DB_PORT,
@@ -25,7 +29,6 @@ const appConfig = {
   database: DB_NAME,
 };
 
-// Database connection pool for application use
 let pool = null;
 
 function getPool() {
@@ -38,6 +41,13 @@ function getPool() {
   }
   return pool;
 }
+
+/**
+ * Database initialization steps:
+ * 1. Wait for database to be ready
+ * 2. Create database if it doesn't exist
+ * 3. Create necessary tables if they don't exist
+ */
 
 async function waitForDatabase(config, maxRetries = 30, delay = 1000) {
   console.log(`[DB] Waiting for database at ${config.host}:${config.port}...`);
@@ -81,6 +91,70 @@ async function createDatabaseIfNotExists() {
   await client.end();
   console.log("[DB] Closed admin connection");
 }
+
+async function createTables() {
+  console.log("[DB] Creating tables...");
+  const client = new Client(appConfig);
+  await client.connect();
+  console.log(`[DB] Connected to application database '${DB_NAME}'`);
+
+  console.log("[DB] Creating 'users' table...");
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL
+    );
+  `);
+  console.log("[DB] 'users' table ready");
+
+  console.log("[DB] Creating 'conversations' table...");
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS conversations (
+      id SERIAL PRIMARY KEY,
+      user_id INT REFERENCES users(id),
+      title TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+  console.log("[DB] 'conversations' table ready");
+
+  console.log("[DB] Creating 'messages' table...");
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id UUID PRIMARY KEY,
+      conversation_id INT REFERENCES conversations(id) ON DELETE CASCADE,
+      role TEXT NOT NULL CHECK (role IN ('user','assistant','system')),
+      type TEXT NOT NULL CHECK (type IN ('text','image','command')),
+      content TEXT NOT NULL,
+      ts BIGINT NOT NULL
+    );
+  `);
+  console.log("[DB] 'messages' table ready");
+
+  await client.end();
+  console.log("[DB] Closed application database connection");
+}
+
+async function init() {
+  console.log("[DB] ========== Database Initialization Started ==========");
+  try {
+    await waitForDatabase(adminConfig);
+    await createDatabaseIfNotExists();
+    await createTables();
+    console.log("[DB] ========== Database Ready ==========");
+    return true;
+  } catch (err) {
+    console.error("[DB] ========== Database Initialization Failed ==========");
+    console.error("[DB] Error:", err.message);
+    process.exit(1);
+  }
+}
+
+/**
+ * Database access functions for users, conversations, and messages.
+ * Each function includes logging for debugging and error handling.
+ */
 
 async function createUser(username, passwordHash) {
   console.log("[DB] Creating user:", username);
@@ -148,49 +222,68 @@ async function createConversation(userId, title) {
   }
 }
 
-async function createTables() {
-  console.log("[DB] Creating tables...");
-  const client = new Client(appConfig);
-  await client.connect();
-  console.log(`[DB] Connected to application database '${DB_NAME}'`);
+async function createMessage({id, conversationId, role, type = "text", content, ts = Date.now()}) {
+  console.log(`[DB] Storing message ${id} in conversation ${conversationId}`);
 
-  console.log("[DB] Creating 'users' table...");
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
-      username TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL
+  try {
+    await getPool().query(
+      `
+      INSERT INTO messages(id, conversation_id, role, type, content, ts)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      `,
+      [id, conversationId, role, type, content, ts]
     );
-  `);
-  console.log("[DB] 'users' table ready");
 
-  console.log("[DB] Creating 'conversations' table...");
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS conversations (
-      id SERIAL PRIMARY KEY,
-      user_id INT REFERENCES users(id),
-      title TEXT,
-      created_at TIMESTAMP DEFAULT NOW()
-    );
-  `);
-  console.log("[DB] 'conversations' table ready");
-
-  await client.end();
-  console.log("[DB] Closed application database connection");
+    console.log(`[DB] Message stored - ID: ${id}, Conversation: ${conversationId}, Role: ${role}`);
+    return { id, conversationId, role, type, content, ts };
+  } catch (err) {
+    console.error("[DB] Error storing message:", err.message);
+    throw err;
+  }
 }
 
-async function init() {
-  console.log("[DB] ========== Database Initialization Started ==========");
+async function getMessagesByConversationId(conversationId, limit = null) {
+  console.log("[DB] Fetching messages for conversation:", conversationId, "limit:", limit);
+
   try {
-    await waitForDatabase(adminConfig);
-    await createDatabaseIfNotExists();
-    await createTables();
-    console.log("[DB] ========== Database Ready ==========");
-    return true;
+    let query;
+    let params;
+
+    if (limit && Number.isInteger(limit)) {
+      // Get latest N messages, then reorder ascending for display
+      query = `
+        SELECT id, role, type, content, ts
+        FROM (
+          SELECT id, role, type, content, ts
+          FROM messages
+          WHERE conversation_id = $1
+          ORDER BY ts DESC
+          LIMIT $2
+        ) sub
+        ORDER BY ts ASC
+      `;
+      params = [conversationId, limit];
+    } else {
+      // Get all messages in ascending order
+      query = `
+        SELECT id, role, type, content, ts
+        FROM messages
+        WHERE conversation_id = $1
+        ORDER BY ts ASC
+      `;
+      params = [conversationId];
+    }
+
+    const result = await getPool().query(query, params);
+
+    console.log(
+      `[DB] Found ${result.rows.length} messages for conversation ${conversationId}`
+    );
+
+    return result.rows;
   } catch (err) {
-    console.error("[DB] ========== Database Initialization Failed ==========");
-    console.error("[DB] Error:", err.message);
-    process.exit(1);
+    console.error("[DB] Error fetching messages:", err.message);
+    throw err;
   }
 }
 

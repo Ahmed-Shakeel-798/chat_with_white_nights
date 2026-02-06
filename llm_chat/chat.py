@@ -23,28 +23,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def event_stream(conversation_id: str):
-    """Stream messages for a conversation using Server-Sent Events"""
-    logger.info(f"[STREAM] Client connected to conversation {conversation_id}")
-    
-    try:
-        yield f"data: {json.dumps({'type': 'connected', 'message': f'Connected to conversation {conversation_id}'})}\n\n"
-        
-        # Keep connection alive
-        while True:
-            time.sleep(1)
-    except Exception as e:
-        logger.error(f"[STREAM] Error in stream for conversation {conversation_id}: {e}")
-
-@app.get("/stream/{conversation_id}")
-def stream(conversation_id: str):
-    """SSE endpoint for streaming messages"""
-    logger.info(f"[SSE] Stream request for conversation {conversation_id}")
-    return StreamingResponse(
-        event_stream(conversation_id),
-        media_type="text/event-stream"
-    )
-
 @app.post("/message")
 def send_message(conversation_id: str, user_id: str, message: str):
     """Receive a message and stream a response"""

@@ -20,31 +20,7 @@ export default function Chat() {
       return;
     }
 
-    console.log("[CHAT] Connecting to conversation:", conversationId);
-    const evt = new EventSource(`${LLM_API_URL}/stream/${conversationId}`);
-
-    evt.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        console.log("[CHAT] Received message:", data);
-
-        if (data.type === "connected") {
-          console.log("[CHAT] Connected to stream");
-        } else if (data.type === "message") {
-          setMessages((prev) => [...prev, { role: data.role, content: data.content }]);
-          scrollToBottom();
-        }
-      } catch (err) {
-        console.error("[CHAT] Error parsing message:", err);
-      }
-    };
-
-    evt.onerror = (err) => {
-      console.error("[CHAT] SSE Error:", err);
-      evt.close();
-    };
-
-    return () => evt.close();
+    console.log("[CHAT] Loaded conversation:", conversationId);
   }, [conversationId, userId, nav]);
 
   const scrollToBottom = () => {
