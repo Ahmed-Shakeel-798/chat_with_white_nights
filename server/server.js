@@ -5,7 +5,7 @@ import jwtPkg from 'jsonwebtoken';
 const { sign } = jwtPkg;
 import cors from 'cors';
 import init, { createUser, getUserByUsername, getConversationsByUserId, createConversation } from './db.js';
-import { connectRedis, initConversation as redisInitConversation } from './redis.js';
+import { connectRedis, initConversation as redisInitConversation, getMessages as redisGetMessages, getLength as redisGetLength } from './redis.js';
 
 console.log("[SERVER] Starting server initialization...");
 
@@ -107,9 +107,29 @@ app.post('/conversations/init', async (req, res) => {
       return res.json({ ok: true, message: 'Already initialized' });
     }
     console.log(`[SERVER] Initialized redis list for conversation ${conversationId}`);
+  
     return res.json({ ok: true });
   } catch (err) {
     console.error('[SERVER] Error initializing conversation in Redis:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/conversations/:id/messages', async (req, res) => {
+  const conversationId = req.params.id;
+  // Allow negative indices for fetching from the end. If not provided, return last 10 messages.
+  const start = req.query.start !== undefined ? parseInt(req.query.start, 10) : -10;
+  const end = req.query.end !== undefined ? parseInt(req.query.end, 10) : -1;
+
+  try {
+    const raw = await redisGetMessages(conversationId, start, end);
+    const parsed = raw.map(r => {
+      try { return JSON.parse(r); } catch { return null; }
+    }).filter(Boolean);
+    const total = await redisGetLength(conversationId);
+    return res.json({ ok: true, messages: parsed, total });
+  } catch (err) {
+    console.error('[SERVER] Error fetching messages from Redis:', err.message);
     return res.status(500).json({ error: err.message });
   }
 });

@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { getConversationMessages } from "../api";
 import "../css/chat.css";
 
 export default function Chat() {
   const { id: conversationId } = useParams();
   const nav = useNavigate();
   const [messages, setMessages] = useState([]);
+  const [totalMessages, setTotalMessages] = useState(0);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -21,10 +23,41 @@ export default function Chat() {
     }
 
     console.log("[CHAT] Loaded conversation:", conversationId);
+
+    (async () => {
+      try {
+        const res = await getConversationMessages(conversationId);
+        if (res?.data) {
+          setMessages(res.data.messages || []);
+          setTotalMessages(res.data.total || 0);
+          setTimeout(() => scrollToBottom(), 50);
+        }
+      } catch (err) {
+        console.error('[CHAT] Failed to load messages', err);
+      }
+    })();
   }, [conversationId, userId, nav]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const loadMore = async () => {
+    if (messages.length >= totalMessages) return;
+    const pageSize = 10;
+    const loaded = messages.length;
+    const start = -(loaded + pageSize);
+    const end = -(loaded + 1);
+
+    try {
+      const res = await getConversationMessages(conversationId, start, end);
+      if (res?.data?.messages?.length) {
+        // prepend older messages
+        setMessages((prev) => [...res.data.messages, ...prev]);
+      }
+    } catch (err) {
+      console.error('[CHAT] Failed to load more messages', err);
+    }
   };
 
   const handleSendMessage = async () => {
@@ -106,6 +139,13 @@ export default function Chat() {
       </div>
 
       <div className="chat-messages">
+        {messages.length < totalMessages && (
+          <div className="load-more-container">
+            <button className="load-more-btn" onClick={loadMore}>
+              Load more
+            </button>
+          </div>
+        )}
         {messages.length === 0 && (
           <p className="no-messages">Start a conversation by sending a message</p>
         )}
