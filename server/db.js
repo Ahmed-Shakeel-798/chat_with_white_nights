@@ -288,4 +288,4 @@ async function getMessagesByConversationId(conversationId, limit = null) {
 }
 
 export default init;
-export { createUser, getUserByUsername, getConversationsByUserId, createConversation, getPool };
+export { createUser, getUserByUsername, getConversationsByUserId, createConversation, createMessage, getMessagesByConversationId, getPool };

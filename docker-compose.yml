@@ -47,6 +47,23 @@ services:
       REDIS_PORT: 6379
       REDIS_URL: redis://redis:6379
 
+  stream-consumer:
+    build: ./server
+    container_name: stream_consumer_worker
+    restart: always
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      DATABASE_URL: postgres://user:pass@postgres:5432/chatdb
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: chatdb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      REDIS_URL: redis://redis:6379
+    command: npm run worker
+
   llm_chat:
     build: ./llm_chat
     container_name: llm_chat_service
