@@ -4,6 +4,8 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
+    "start": "node server.js",
+    "worker": "node stream-consumer.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

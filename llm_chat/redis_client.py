@@ -27,9 +27,9 @@ def get_client():
 def get_conversation_key(conversation_id: str) -> str:
     return f"conversation:{conversation_id}"
 
-def push_message(conversation_id: str, role: str, content: str, msg_type: str = "text"):
+def push_message(conversation_id: str, role: str, content: str, msg_type: str = "text", user_id: str | None = None):
     """
-    Store a message in Redis list.
+    Store a message in Redis list and append an event to a Redis stream (fire-and-forget).
     Returns the stored message object.
     """
     if not redis_client:
@@ -48,6 +48,24 @@ def push_message(conversation_id: str, role: str, content: str, msg_type: str = 
     try:
         redis_client.rpush(key, json.dumps(msg))
         logger.info(f"[REDIS] Pushed {role} message {msg['id']} to {key}")
+
+        # Fire-and-forget: append an event to the messages_stream for downstream workers
+        try:
+            stream_mapping = {
+                "conversation_id": conversation_id,
+                "user_id": user_id or "",
+                "message_id": msg["id"],
+                "role": role,
+                "type": msg_type,
+                "content": content,
+                "ts": str(msg["ts"]) 
+            }
+            # XADD -- use '*' id to let Redis assign one
+            redis_client.xadd("messages_stream", stream_mapping)
+            logger.info(f"[REDIS] XADD messages_stream {msg['id']}")
+        except Exception as se:
+            logger.error(f"[REDIS] Failed to XADD to stream: {se}")
+
         return msg
     except Exception as e:
         logger.error(f"[REDIS] Failed to push message: {e}")

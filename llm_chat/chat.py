@@ -30,7 +30,7 @@ init_redis()
 async def send_message(conversation_id: str, user_id: str, message: str):
     try:
         logger.info(f"[MESSAGE] User {user_id} in conversation {conversation_id}: {message}")
-        push_message(conversation_id, "user", message)
+        push_message(conversation_id, "user", message, user_id=user_id)
 
         def sse_wrapper():
             full_response = ""
@@ -41,7 +41,7 @@ async def send_message(conversation_id: str, user_id: str, message: str):
 
             # push assistant message AFTER stream completes
             try:
-                push_message(conversation_id, "assistant", full_response)
+                push_message(conversation_id, "assistant", full_response, user_id=user_id)
             except Exception as e:
                 logger.error(f"[REDIS] Failed to push assistant message: {e}")
 
