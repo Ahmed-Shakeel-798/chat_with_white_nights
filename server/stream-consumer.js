@@ -92,6 +92,10 @@ async function processEntry(id, msg) {
     // On success, acknowledge the message
     await redisClient.xAck(STREAM_KEY, CONSUMER_GROUP, id);
     console.log(`[WORKER] ACKed message ${id}`);
+
+    // delete the message from stream after ACK
+    await redisClient.xDel(STREAM_KEY, id);
+    console.log(`[WORKER] Deleted message ${id} from stream`);
     
     return true;
   } catch (err) {

@@ -21,11 +21,14 @@ def init_redis():
         logger.error(f"[REDIS] Failed to connect: {e}")
         redis_client = None
 
+
 def get_client():
     return redis_client
 
+
 def get_conversation_key(conversation_id: str) -> str:
     return f"conversation:{conversation_id}"
+
 
 def push_message(conversation_id: str, role: str, content: str, msg_type: str = "text", user_id: str | None = None):
     """
@@ -70,6 +73,7 @@ def push_message(conversation_id: str, role: str, content: str, msg_type: str = 
     except Exception as e:
         logger.error(f"[REDIS] Failed to push message: {e}")
         return None
+
 
 def get_messages(conversation_id: str, limit: int | None = None):
     """
