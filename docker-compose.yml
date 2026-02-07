@@ -63,6 +63,10 @@ services:
       REDIS_PORT: 6379
       REDIS_URL: redis://redis:6379
 
+      # Ollama / LLM
+      LLM_BASE_URL: http://host.docker.internal:11434/v1
+      LLM_API_KEY: ollama # NOTE TO SELF: DO NOT POST YOUR ACTUAL API KEY TO GITHUB, USE A PLACEHOLDER AND SET THE REAL ONE IN YOUR ENVIRONMENT
+
   client:
     build: ./client
     container_name: chat_client

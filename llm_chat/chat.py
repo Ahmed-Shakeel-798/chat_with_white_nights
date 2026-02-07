@@ -3,8 +3,8 @@ from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import json
-
 from redis_client import init_redis, push_message
+from llm_client import stream_from_ollama
 
 # Configure logging
 logging.basicConfig(
@@ -27,29 +27,30 @@ app.add_middleware(
 init_redis()
 
 @app.post("/message")
-def send_message(conversation_id: str, user_id: str, message: str):
-    logger.info(f"[MESSAGE] User {user_id} in conversation {conversation_id}: {message}")
+async def send_message(conversation_id: str, user_id: str, message: str):
+    try:
+        logger.info(f"[MESSAGE] User {user_id} in conversation {conversation_id}: {message}")
+        push_message(conversation_id, "user", message)
 
-    def message_stream():
-        try:
-            # Store user message
-            push_message(conversation_id, "user", message)
+        def sse_wrapper():
+            full_response = ""
 
-            # Simulate LLM response
-            response = f"Echo: {message}"
-            logger.info(f"[RESPONSE] Sending response to conversation {conversation_id}")
+            for delta in stream_from_ollama(message):
+                full_response += delta
+                yield f"data: {json.dumps({'type': 'message', 'content': delta})}\n\n"
 
-            # Store assistant/system message
-            push_message(conversation_id, "system", response)
+            # push assistant message AFTER stream completes
+            try:
+                push_message(conversation_id, "assistant", full_response)
+            except Exception as e:
+                logger.error(f"[REDIS] Failed to push assistant message: {e}")
 
-            # Stream to frontend
-            yield f"data: {json.dumps({'type': 'message', 'role': 'assistant', 'content': response})}\n\n"
+        return StreamingResponse(sse_wrapper(), media_type="text/event-stream")
 
-        except Exception as e:
-            logger.error(f"[MESSAGE] Error: {e}")
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to process message: {e}")
+        return {"error": str(e)}
 
-    return StreamingResponse(message_stream(), media_type="text/event-stream")
 
 @app.get("/health")
 def health_check():

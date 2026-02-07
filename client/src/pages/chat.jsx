@@ -91,31 +91,45 @@ export default function Chat() {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+      let buffer = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const text = decoder.decode(value);
-        const lines = text.split("\n");
+        const chunk = decoder.decode(value, { stream: true });
+        // append new chunk to buffer
+        buffer += chunk;
+        // process complete SSE events separated by double newline
+        let idx;
+        while ((idx = buffer.indexOf("\n\n")) !== -1) {
+          const eventStr = buffer.slice(0, idx).trim();
+          buffer = buffer.slice(idx + 2);
 
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const jsonStr = line.slice(6);
-            if (jsonStr.trim()) {
-              const data = JSON.parse(jsonStr);
-              if (data.type === "message") {
-                setMessages((prev) => {
-                  const lastMsg = prev[prev.length - 1];
-                  if (lastMsg?.role === "assistant") {
-                    return [
-                      ...prev.slice(0, -1),
-                      { role: "assistant", content: lastMsg.content + data.content },
-                    ];
-                  }
-                  return [...prev, { role: "assistant", content: data.content }];
-                });
-                scrollToBottom();
+          // each event may contain multiple lines; find data: lines
+          const eventLines = eventStr.split(/\r?\n/);
+          for (const el of eventLines) {
+            if (el.startsWith("data: ")) {
+              const jsonStr = el.slice(6).trim();
+              if (!jsonStr) continue;
+              try {
+                const data = JSON.parse(jsonStr);
+                console.debug('[CHAT] Stream chunk received', data);
+                if (data.type === "message") {
+                  setMessages((prev) => {
+                    const lastMsg = prev[prev.length - 1];
+                    if (lastMsg?.role === "assistant") {
+                      return [
+                        ...prev.slice(0, -1),
+                        { role: "assistant", content: lastMsg.content + data.content },
+                      ];
+                    }
+                    return [...prev, { role: "assistant", content: data.content }];
+                  });
+                  scrollToBottom();
+                }
+              } catch (err) {
+                console.error('[CHAT] Error parsing stream JSON', err, jsonStr);
               }
             }
           }
