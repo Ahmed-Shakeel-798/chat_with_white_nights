@@ -49,8 +49,13 @@ def push_message(conversation_id: str, role: str, content: str, msg_type: str = 
     key = get_conversation_key(conversation_id)
 
     try:
-        redis_client.rpush(key, json.dumps(msg))
-        logger.info(f"[REDIS] Pushed {role} message {msg['id']} to {key}")
+        # Push + trim atomically (single roundtrip, sequential execution)
+        with redis_client.pipeline() as pipe:
+            pipe.rpush(key, json.dumps(msg))
+            pipe.ltrim(key, -10, -1)
+            pipe.execute()
+
+        logger.info(f"[REDIS] Pushed {role} message {msg['id']} to {key} (trimmed to last 10)")
 
         # Fire-and-forget: append an event to the messages_stream for downstream workers
         try:
@@ -63,7 +68,7 @@ def push_message(conversation_id: str, role: str, content: str, msg_type: str = 
                 "content": content,
                 "ts": str(msg["ts"]) 
             }
-            # XADD -- use '*' id to let Redis assign one
+            
             redis_client.xadd("messages_stream", stream_mapping)
             logger.info(f"[REDIS] XADD messages_stream {msg['id']}")
         except Exception as se:
