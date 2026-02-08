@@ -5,7 +5,7 @@ import jwtPkg from 'jsonwebtoken';
 const { sign } = jwtPkg;
 import cors from 'cors';
 import init, { createUser, getUserByUsername, getConversationsByUserId, createConversation, getMessagesByConversationId, getMessageCountByConversationId } from './db.js';
-import { connectRedis, initConversation as redisInitConversation, deleteConversation as redisDeleteConversation } from './redis.js';
+import { connectRedis, initConversation as redisInitConversation, deleteConversation as redisDeleteConversation, pushMessage as redisPushMessage } from './redis.js';
 
 console.log("[SERVER] Starting server initialization...");
 
@@ -101,13 +101,20 @@ app.post('/conversations/init', async (req, res) => {
   const { conversationId } = req.body;
   if (!conversationId) return res.status(400).json({ error: 'Missing conversationId' });
   try {
+    // In case the conversation already exists, or wasn't deleted previously.
+    await redisDeleteConversation(conversationId);
+    console.log(`[SERVER] Deleted conversation ${conversationId} from Redis`);
+
     const result = await redisInitConversation(conversationId);
-    if (result.already) {
-      console.log(`[SERVER] Redis key already exists for conversation:${conversationId}`);
-      return res.json({ ok: true, message: 'Already initialized' });
-    }
     console.log(`[SERVER] Initialized redis list for conversation ${conversationId}`);
   
+    // Load the latest ten messages into redis conversation list (context cache)
+    const dbMessages = await getMessagesByConversationId(conversationId, 10, 0);
+    for (const msg of dbMessages) {
+      await redisPushMessage(conversationId, msg);
+    }
+    console.log(`[SERVER] Loaded ${dbMessages.length} messages from database to Redis for conversation ${conversationId}`);
+
     return res.json({ ok: true });
   } catch (err) {
     console.error('[SERVER] Error initializing conversation in Redis:', err.message);
