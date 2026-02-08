@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getConversationMessages } from "../api";
+import { deleteConversationFromContextCache, getConversationMessages } from "../api";
 import "../css/chat.css";
 
 export default function Chat() {
@@ -59,6 +59,17 @@ export default function Chat() {
     } catch (err) {
       console.error('[CHAT] Failed to load more messages', err);
     }
+  };
+
+  const handleBack = async () => {
+    try {
+      // Remove conversation from Redis
+      await deleteConversationFromContextCache(conversationId);
+      console.log("[CHAT] Conversation removed from Redis");
+    } catch (err) {
+      console.error("[CHAT] Error removing conversation from Redis:", err);
+    }
+    nav("/select");
   };
 
   const handleSendMessage = async () => {
@@ -148,7 +159,7 @@ export default function Chat() {
     <div className="chat-wrapper">
       <div className="chat-header">
         <h2>Conversation #{conversationId}</h2>
-        <button className="back-btn" onClick={() => nav("/select")}>
+        <button className="back-btn" onClick={handleBack}>
           Back
         </button>
       </div>

@@ -5,7 +5,7 @@ import jwtPkg from 'jsonwebtoken';
 const { sign } = jwtPkg;
 import cors from 'cors';
 import init, { createUser, getUserByUsername, getConversationsByUserId, createConversation, getMessagesByConversationId, getMessageCountByConversationId } from './db.js';
-import { connectRedis, initConversation as redisInitConversation } from './redis.js';
+import { connectRedis, initConversation as redisInitConversation, deleteConversation as redisDeleteConversation } from './redis.js';
 
 console.log("[SERVER] Starting server initialization...");
 
@@ -115,6 +115,22 @@ app.post('/conversations/init', async (req, res) => {
   }
 });
 
+/* DELETE CONVERSATION FROM REDIS */
+app.delete('/conversations/:id', async (req, res) => {
+  const conversationId = req.params.id;
+  if (!conversationId) return res.status(400).json({ error: 'Missing conversationId' });
+  
+  try {
+    await redisDeleteConversation(conversationId);
+    console.log(`[SERVER] Deleted conversation ${conversationId} from Redis`);
+    return res.json({ ok: true, message: 'Conversation deleted from Redis' });
+  } catch (err) {
+    console.error(`[SERVER] Error deleting conversation from Redis:`, err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/** FETCH MESSAGES FROM DATABASE */
 app.get('/conversations/:id/messages', async (req, res) => {
   const conversationId = req.params.id;
   // Pagination: offset = how many messages to skip from the end, limit = batch size

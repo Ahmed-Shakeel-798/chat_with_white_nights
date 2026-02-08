@@ -47,4 +47,9 @@ export const getConversationMessages = (conversationId, offset = 0, limit = 10) 
   return api.get(url);
 };
 
+export const deleteConversationFromContextCache = (conversationId) => {
+  const url = `/conversations/${conversationId}`;
+  return api.delete(url);
+}
+
 export default api;

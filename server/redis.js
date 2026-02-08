@@ -61,6 +61,12 @@ export async function getLength(conversationId) {
 	return await client.lLen(key);
 }
 
+export async function deleteConversation(conversationId) {
+	if (!client) await connectRedis();
+	const key = `conversation:${conversationId}`;
+	return await client.del(key);
+}
+
 export default {
 	connectRedis,
 	exists,
@@ -68,4 +74,5 @@ export default {
 	pushMessage,
 	getMessages,
 	getLength,
+	deleteConversation,
 };
