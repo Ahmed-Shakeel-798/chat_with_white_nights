@@ -68,7 +68,7 @@ def push_message(conversation_id: str, role: str, content: str, msg_type: str = 
                 "content": content,
                 "ts": str(msg["ts"]) 
             }
-            
+
             redis_client.xadd("messages_stream", stream_mapping)
             logger.info(f"[REDIS] XADD messages_stream {msg['id']}")
         except Exception as se:
