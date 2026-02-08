@@ -1,4 +1,5 @@
 import 'dotenv/config.js';
+import pLimit from 'p-limit';
 import { createClient } from 'redis';
 import init, { createMessage } from './db.js';
 
@@ -9,6 +10,8 @@ const CONSUMER_GROUP = 'pg-writers'; // logical group Redis uses to distribute w
 const STREAM_KEY = 'messages_stream'; // stream name.
 const BATCH_SIZE = 100; // max messages per read.
 const BLOCK_MS = 5000; // long-poll timeout.
+
+const PARALLEL_LIMIT = pLimit(5); // max 5 concurrent DB inserts
 
 let redisClient = null;
 
@@ -85,7 +88,7 @@ async function insertMessage(msg) {
 async function processEntry(id, msg) {
   try {
     console.log(`[WORKER] Processing message ${id} for conversation ${msg.conversation_id}`);
-    
+
     // Insert into Postgres using shared DB function
     await insertMessage(msg);
     
@@ -132,7 +135,6 @@ async function consumerLoop() {
       );
       
       if (!messages || messages.length === 0) {
-        // Timeout (no new messages)
         consecutiveErrors = 0;
         continue;
       }
@@ -162,6 +164,39 @@ async function consumerLoop() {
 }
 
 /**
+ * Claim and process pending messages from other consumers
+ * Ensures no unprocessed message is left behind
+ */
+async function claimAndProcessPendingMessages() {
+  try {
+    let startId = '-';
+    const batchSize = 100;
+
+    console.log('[WORKER] Checking for pending messages to claim...');
+
+    while (true) {
+        const pendingEntries = await redisClient.xPendingRange( STREAM_KEY, CONSUMER_GROUP, startId, '+', batchSize);
+
+        if (!pendingEntries || pendingEntries.length === 0) break;
+
+        const idsToClaim = pendingEntries.map(m => m.id);
+
+        const claimedEntries = await redisClient.xClaim( STREAM_KEY, CONSUMER_GROUP, WORKER_ID, 0, idsToClaim );
+
+        // Process claimed messages in parallel with a concurrency limit
+        await Promise.all(claimedEntries.map(entry => PARALLEL_LIMIT(() => processEntry(entry.id, entry.message))));
+
+        startId = pendingEntries[pendingEntries.length - 1].id; // process next batch
+        if (pendingEntries.length < batchSize) break;
+    }
+    console.log('[WORKER] Pending messages processed.');
+  } catch (error) {
+    console.error('[WORKER] Error processing pending messages:', err.message);
+  }
+}
+
+
+/**
  * Main entry point
  */
 async function main() {
@@ -176,6 +211,9 @@ async function main() {
     
     // Ensure consumer group exists
     await ensureConsumerGroup();
+
+    // Process any pending messages from other consumers
+    await claimAndProcessPendingMessages();
     
     // Start consumer loop
     await consumerLoop();
