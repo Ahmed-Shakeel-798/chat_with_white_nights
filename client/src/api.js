@@ -42,13 +42,8 @@ export const initConversation = (conversationId) => {
   return api.post('/conversations/init', { conversationId });
 };
 
-export const getConversationMessages = (conversationId, start, end) => {
-  let url = `/conversations/${conversationId}/messages`;
-
-  if (start !== undefined && end !== undefined) {
-    url += `?start=${start}&end=${end}`;
-  }
-
+export const getConversationMessages = (conversationId, offset = 0, limit = 10) => {
+  const url = `/conversations/${conversationId}/messages?offset=${offset}&limit=${limit}`;
   return api.get(url);
 };
 

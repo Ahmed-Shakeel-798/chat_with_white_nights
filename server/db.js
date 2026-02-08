@@ -242,42 +242,47 @@ async function createMessage({id, conversationId, role, type = "text", content, 
   }
 }
 
-async function getMessagesByConversationId(conversationId, limit = null) {
-  console.log("[DB] Fetching messages for conversation:", conversationId, "limit:", limit);
+async function getMessageCountByConversationId(conversationId) {
+  console.log("[DB] Fetching message count for conversation:", conversationId);
 
   try {
-    let query;
-    let params;
+    const result = await getPool().query(
+      'SELECT COUNT(*) as count FROM messages WHERE conversation_id = $1',
+      [conversationId]
+    );
+    
+    const count = parseInt(result.rows[0].count, 10);
+    console.log(`[DB] Conversation ${conversationId} has ${count} messages`);
+    return count;
+  } catch (err) {
+    console.error("[DB] Error fetching message count:", err.message);
+    throw err;
+  }
+}
 
-    if (limit && Number.isInteger(limit)) {
-      // Get latest N messages, then reorder ascending for display
-      query = `
-        SELECT id, role, type, content, ts
-        FROM (
-          SELECT id, role, type, content, ts
-          FROM messages
-          WHERE conversation_id = $1
-          ORDER BY ts DESC
-          LIMIT $2
-        ) sub
-        ORDER BY ts ASC
-      `;
-      params = [conversationId, limit];
-    } else {
-      // Get all messages in ascending order
-      query = `
+async function getMessagesByConversationId(conversationId, limit = 10, offset = 0) {
+  console.log("[DB] Fetching messages for conversation:", conversationId, "limit:", limit, "offset:", offset);
+
+  try {
+    // Fetch the latest (limit + offset) messages, skip the first offset, take limit
+    // This gives us the next page when paginating backwards from the most recent
+    const query = `
+      SELECT id, role, type, content, ts
+      FROM (
         SELECT id, role, type, content, ts
         FROM messages
         WHERE conversation_id = $1
-        ORDER BY ts ASC
-      `;
-      params = [conversationId];
-    }
+        ORDER BY ts DESC
+        LIMIT $2 OFFSET $3
+      ) sub
+      ORDER BY ts ASC
+    `;
+    const params = [conversationId, limit, offset];
 
     const result = await getPool().query(query, params);
 
     console.log(
-      `[DB] Found ${result.rows.length} messages for conversation ${conversationId}`
+      `[DB] Found ${result.rows.length} messages for conversation ${conversationId} (limit: ${limit}, offset: ${offset})`
     );
 
     return result.rows;
@@ -288,4 +293,4 @@ async function getMessagesByConversationId(conversationId, limit = null) {
 }
 
 export default init;
-export { createUser, getUserByUsername, getConversationsByUserId, createConversation, createMessage, getMessagesByConversationId, getPool };
+export { createUser, getUserByUsername, getConversationsByUserId, createConversation, createMessage, getMessagesByConversationId, getMessageCountByConversationId, getPool };
