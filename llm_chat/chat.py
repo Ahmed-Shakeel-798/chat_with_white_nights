@@ -3,8 +3,8 @@ from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import json
-from redis_client import init_redis, push_message
-from llm_client import stream_from_ollama
+from redis_client import init_redis, push_message, get_messages
+from llm_client import stream_from_ollama, build_messages
 
 # Configure logging
 logging.basicConfig(
@@ -29,13 +29,18 @@ init_redis()
 @app.post("/message")
 async def send_message(conversation_id: str, user_id: str, message: str):
     try:
+
+        conversation_history = get_messages(conversation_id, limit=10)
+
         logger.info(f"[MESSAGE] User {user_id} in conversation {conversation_id}: {message}")
         push_message(conversation_id, "user", message, user_id=user_id)
+
+        messages_for_llm = build_messages(query = message, conversation_history = conversation_history)
 
         def sse_wrapper():
             full_response = ""
 
-            for delta in stream_from_ollama(message):
+            for delta in stream_from_ollama(messages_for_llm):
                 full_response += delta
                 yield f"data: {json.dumps({'type': 'message', 'content': delta})}\n\n"
 
@@ -56,3 +61,4 @@ async def send_message(conversation_id: str, user_id: str, message: str):
 def health_check():
     logger.info("[HEALTH] Health check requested")
     return {"status": "healthy"}
+
