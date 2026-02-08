@@ -8,6 +8,7 @@ export default function Chat() {
   const nav = useNavigate();
   const [messages, setMessages] = useState([]);
   const [totalMessages, setTotalMessages] = useState(0);
+  const [currentOffset, setCurrentOffset] = useState(0);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -26,10 +27,11 @@ export default function Chat() {
 
     (async () => {
       try {
-        const res = await getConversationMessages(conversationId);
+        const res = await getConversationMessages(conversationId, 0, 10);
         if (res?.data) {
           setMessages(res.data.messages || []);
           setTotalMessages(res.data.total || 0);
+          setCurrentOffset(0);
           setTimeout(() => scrollToBottom(), 50);
         }
       } catch (err) {
@@ -45,15 +47,14 @@ export default function Chat() {
   const loadMore = async () => {
     if (messages.length >= totalMessages) return;
     const pageSize = 10;
-    const loaded = messages.length;
-    const start = -(loaded + pageSize);
-    const end = -(loaded + 1);
+    const nextOffset = currentOffset + pageSize;
 
     try {
-      const res = await getConversationMessages(conversationId, start, end);
+      const res = await getConversationMessages(conversationId, nextOffset, pageSize);
       if (res?.data?.messages?.length) {
         // prepend older messages
         setMessages((prev) => [...res.data.messages, ...prev]);
+        setCurrentOffset(nextOffset);
       }
     } catch (err) {
       console.error('[CHAT] Failed to load more messages', err);
